@@ -2,6 +2,7 @@ package faster
 
 import (
 	"container/list"
+	"github.com/faster/zset"
 	"time"
 )
 
@@ -24,6 +25,8 @@ type entry struct {
 	value      interface{}
 	//hash map type
 	hashMap    map[string]interface{}
+	//zset
+	zSet       map[string]*zset.Zset
 }
 
 type EvictFunc func(key interface{}, value interface{})
@@ -65,6 +68,8 @@ func (fc *fasterCache) clean() {
 	}
 	fc.evictList.Init()
 }
+
+//key value
 
 //set key value
 func (fc *fasterCache) set(key string, value interface{}, expiration time.Duration) {
@@ -271,6 +276,7 @@ func (fc *fasterCache) expire(key string, expiration time.Duration) {
 	return
 }
 
+//hash set
 
 //hset key subkey value
 func (fc *fasterCache) hSet(key, subKey string, value interface{}, expiration time.Duration) {
@@ -527,6 +533,15 @@ func (fc *fasterCache) hIncrBy(key, subKey string, incr int64) int64 {
 
 	return value
 }
+
+
+//zset
+
+//zadd key member score
+
+
+
+
 
 //remove tail
 func (fc *fasterCache) removeTail() {
