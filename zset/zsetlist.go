@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultMaxLevel = 16
+	defaultMaxLevel = 2
 	defaultP = 4
 )
 
@@ -38,6 +38,7 @@ func newZsetListNode(level int, member string, score int64) *ZsetNode {
 		Member: member,
 		Levels: make([]*ZsetLevel, 0),
 	}
+
 	for i := 0; i < level; i++ {
 		zNode.Levels = append(zNode.Levels, &ZsetLevel{})
 	}
@@ -49,7 +50,7 @@ func NewZsetList() *ZsetList {
 	z := &ZsetList{
 		Level: 1,
 		Length: 0,
-		Header: newZsetListNode(defaultMaxLevel, "",  0),
+		Header: newZsetListNode(defaultMaxLevel, "header",  0),
 	}
 	for i := 0; i < defaultMaxLevel; i++ {
 		z.Header.Levels[i].Forward = nil
@@ -61,7 +62,7 @@ func NewZsetList() *ZsetList {
 }
 
 //get random level
-func zRandomLevel() int {
+func ZRandomLevel() int {
 	level := 1
 	for {
 		if rand.Int() & 0xFFFF < 0xFFFF / defaultP {
@@ -78,18 +79,12 @@ func zRandomLevel() int {
 }
 
 
-func (z *ZsetList) getRankUpdateList(score int64, member string) (*ZsetNode, []int64, []*ZsetNode) {
-	updateList := make([]*ZsetNode, 0)
-	for i := 0; i < defaultMaxLevel; i++ {
-		updateList = append(updateList, &ZsetNode{})
-	}
-	rankList := make([]int64, 0)
-	for i := 0; i < defaultMaxLevel; i++ {
-		rankList = append(rankList, 0)
-	}
-
+func (z *ZsetList) getRankUpdateList(score int64, member string) (*ZsetNode, [defaultMaxLevel]int64, [defaultMaxLevel]*ZsetNode) {
+	var rankList [defaultMaxLevel] int64
+	var updateList [defaultMaxLevel] *ZsetNode
+	var zn *ZsetNode
 	//get rank and updates
-	zn := z.Header
+	zn = z.Header
 	for i := z.Level - 1; i >= 0; i-- {
 		if i == z.Level -1 {
 			rankList[i] = 0
@@ -107,9 +102,18 @@ func (z *ZsetList) getRankUpdateList(score int64, member string) (*ZsetNode, []i
 
 
 func (z *ZsetList) zInsert(member string, score int64) {
-	zn, rankList, updateList := z.getRankUpdateList(score, member)
+	fmt.Printf("insert %s %d\n", member, score)
+	_, rankList, updateList := z.getRankUpdateList(score, member)
+	/*
+	for k, v := range updateList {
+		fmt.Printf("updateList %d:\n", k)
+		printNode(v)
+	}
+	fmt.Println()
+	*/
 	//init
-	level := zRandomLevel()
+	level := ZRandomLevel()
+	//fmt.Printf("random level is %d\n", level)
 	if level > z.Level {
 		for i := z.Level; i < level; i++ {
 			rankList[i] = 0
@@ -119,18 +123,15 @@ func (z *ZsetList) zInsert(member string, score int64) {
 		z.Level = level
 	}
 	//insert node
-	zn = newZsetListNode(level, member, score)
-	//fmt.Printf("zn: %v, rank: %v, update: %v\n", *zn, rankList, updateList)
-	if level > z.Level {
-		for i := 0; i < level; i++ {
-			zn.Levels[i].Forward = updateList[i].Levels[i].Forward
-			updateList[i].Levels[i].Forward = zn
+	zn := newZsetListNode(level, member, score)
+	for i := 0; i < level; i++ {
+		zn.Levels[i].Forward = updateList[i].Levels[i].Forward
+		updateList[i].Levels[i].Forward = zn
 
-			zn.Levels[i].Span = updateList[i].Levels[i].Span - (rankList[0] - rankList[i])
-			updateList[i].Levels[i].Span = (rankList[0] - rankList[i]) + 1
-		}
+		zn.Levels[i].Span = updateList[i].Levels[i].Span - (rankList[0] - rankList[i])
+		updateList[i].Levels[i].Span = (rankList[0] - rankList[i]) + 1
 	}
-	fmt.Printf("z.Header: %v, z.Tail: %v, z.Level: %d, z.Length: %d\n", z.Header, z.Tail, z.Level, z.Length)
+	//fmt.Printf("z.Header: %v, z.Tail: %v, z.Level: %d, z.Length: %d\n", z.Header, z.Tail, z.Level, z.Length)
 	//update span
 	for i := level; i < z.Level; i++ {
 		updateList[i].Levels[i].Span++
@@ -150,7 +151,8 @@ func (z *ZsetList) zInsert(member string, score int64) {
 	z.Length++
 }
 
-func (z *ZsetList) zDeleteNode(zn *ZsetNode, updateList []*ZsetNode) {
+/*
+func (z *ZsetList) zDeleteNode(zn *ZsetNode, updateList [defaultMaxLevel]*ZsetNode) {
 	for i := 0; i < z.Level; i++ {
 		if updateList[i].Levels[i].Forward == zn {
 			updateList[i].Levels[i].Span += zn.Levels[i].Span - 1
@@ -170,6 +172,7 @@ func (z *ZsetList) zDeleteNode(zn *ZsetNode, updateList []*ZsetNode) {
 	z.Length--
 }
 
+
 func (z *ZsetList) zDelete(score int64, member string) {
 	zn, _, updateList := z.getRankUpdateList(score, member)
 	zn = zn.Levels[0].Forward
@@ -178,7 +181,6 @@ func (z *ZsetList) zDelete(score int64, member string) {
 	}
 	return
 }
-
 
 func (z *ZsetList) zUpdateScore(member string, oldScore int64, newScore int64) {
 	zn, _, updateList := z.getRankUpdateList(oldScore, member)
@@ -193,6 +195,7 @@ func (z *ZsetList) zUpdateScore(member string, oldScore int64, newScore int64) {
 	z.zDeleteNode(zn, updateList)
 	z.zInsert(member, newScore)
 }
+
 
 
 func (z *ZsetList) zGetRank(score int64, member string) int64 {
@@ -224,17 +227,52 @@ func (z *ZsetList) zGetMemberByRank(rank int64) *ZsetNode {
 	}
 	return nil
 }
+*/
 
+
+func printNode(node *ZsetNode) {
+	if node == nil {
+		return
+	}
+	fmt.Printf("****Node: %s, score: %d\n", node.Member, node.Score)
+	if node.Backward == nil {
+		fmt.Printf("Backward: nil\n")
+	} else {
+		fmt.Printf("Backward: (member: %s, score: %d)\n", node.Backward.Member, node.Backward.Score)
+	}
+	for k, v := range node.Levels {
+		if v == nil {
+			fmt.Printf("level %d: nil\n", k)
+		} else {
+			if v.Forward != nil {
+				fmt.Printf("level %d: [Forward: (member: %s, score: %d)]\n", k, v.Forward.Member, v.Forward.Score)
+			}
+		}
+	}
+	fmt.Printf("******************************\n")
+	return
+}
+
+
+func (z *ZsetList) PrintMeta() {
+	fmt.Printf("####meta level = %d, length = %d\n", z.Level, z.Length)
+	fmt.Printf("header->%s\n", z.Header.Member)
+	if z.Tail != nil {
+		fmt.Printf("tail->%s\n", z.Tail.Member)
+	}
+	fmt.Printf("###############################\n")
+}
 
 func (z *ZsetList) Print() {
-	zn := z.Header
-	for i := z.Level; i >= 0; i-- {
-		fmt.Printf("%d\n", i)
-		for ; zn.Levels[i].Forward != nil; {
-			fmt.Printf(">>> %s:%d ", zn.Member, zn.Score)
+	z.PrintMeta()
+	for i := z.Level - 1; i >= 0; i-- {
+		fmt.Printf("+++++++++++++level %d++++++++++++++++\n", i)
+		zn := z.Header
+		for ; zn != nil; {
+			//printNode(zn)
+			fmt.Printf("%s:%d  ", zn.Member, zn.Score)
 			zn = zn.Levels[i].Forward
 		}
-		fmt.Printf("\n")
 	}
 }
 

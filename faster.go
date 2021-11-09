@@ -1,10 +1,10 @@
 package faster
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"math"
 	"math/big"
-	mrnd "math/rand"
+	mrand "math/rand"
 	"os"
 	"sync"
 	"time"
@@ -22,10 +22,10 @@ func NewFaster(mode int, num uint32, size int, onEvict EvictFunc) *Faster {
 	//generate a seed, used for djb33
 	var seed uint32
 	max := big.NewInt(0).SetUint64(uint64(math.MaxUint32))
-	rnd, err := rand.Int(rand.Reader, max)
+	rnd, err := crand.Int(crand.Reader, max)
 	if err != nil {
 		_, _ = os.Stderr.Write([]byte("\n"))
-		seed = mrnd.Uint32()
+		seed = mrand.Uint32()
 	} else {
 		seed = uint32(rnd.Uint64())
 	}
@@ -43,9 +43,11 @@ func NewFaster(mode int, num uint32, size int, onEvict EvictFunc) *Faster {
 	return hc
 }
 
+
 func (f *Faster) idx(k string) uint32 {
 	return djb33(f.seed, k) % f.num
 }
+
 
 func (f *Faster) Set(key string, value interface{}, expiration time.Duration) {
 	i := f.idx(key)
