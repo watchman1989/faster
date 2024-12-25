@@ -50,5 +50,22 @@ func NewFastCache(mode string, size int, onEvict Evit) *fastCache {
 }
 
 func (fc *fastCache) Set(key string, value interface{}, expire time.Duration) {
+	if key == "" {
+		return
+	}
+	if ee, ok := fc.dataMap[key]; ok {
+		ent := ee.Value.(*entry)
+		if ent.dataType != DataTypeKV {
 
+		}
+	}
+}
+
+func (fc *fastCache) removeElement(e *list.Element) {
+	fc.evictList.Remove(e)
+	ent := e.Value.(*entry)
+	delete(fc.dataMap, ent.key)
+	if fc.onEvict != nil {
+		fc.onEvict(ent.key, ent.value)
+	}
 }
